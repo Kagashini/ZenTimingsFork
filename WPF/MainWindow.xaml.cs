@@ -11,12 +11,15 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ZenStates.Core;
+using ZenStates.Core.DRAM;
 using ZenTimings.Plugin;
 using ZenTimings.Windows;
+using static ZenStates.Core.DRAM.Ddr5Timings;
 using static ZenTimings.MemoryConfig;
 using Forms = System.Windows.Forms;
 using MessageBox = AdonisUI.Controls.MessageBox;
@@ -53,6 +56,28 @@ namespace ZenTimings
         private readonly string AssemblyVersion = ((AssemblyFileVersionAttribute)Attribute.GetCustomAttribute(
             Assembly.GetExecutingAssembly(),
             typeof(AssemblyFileVersionAttribute), false)).Version;
+        public readonly struct NitroSettings
+        {
+            public byte RxData { get; }
+
+            public byte TxData { get; }
+
+            public byte CtrlLine { get; }
+
+            public NitroSettings(uint nitrosettings)
+            {
+                CtrlLine = (byte)(nitrosettings & 3u);
+                TxData = (byte)((nitrosettings >> 4) & 3u);
+                RxData = (byte)((nitrosettings >> 8) & 3u);
+            }
+
+            public override string ToString()
+            {
+                return $"{RxData}/{TxData}/{CtrlLine}";
+            }
+        }
+
+        public NitroSettings Nitro { get; private set; }
 
         public MainWindow()
         {
@@ -531,11 +556,14 @@ namespace ZenTimings
                     labelRttNomRd.IsEnabled = true;
                     labelRttParkD5.IsEnabled = true;
                     labelRttParkDqs.IsEnabled = true;
+                    labelNitroSettings.IsEnabled = true;
 
                     textBoxMemVddio.Text = Data.MemVddio.ToString();
                     textBoxMemVddq.Text = Data.MemVddq.ToString();
                     textBoxMemVpp.Text = Data.MemVpp.ToString();
                     textBoxApuVddio.Text = Data.ApuVddio.ToString();
+                    textNitroSettings.Text = Nitro.ToString();
+
 
                     try
                     {
@@ -617,6 +645,9 @@ namespace ZenTimings
             uint trfcTimings3 = cpu.ReadDword(offset | 0x5026C);
             uint timings22 = cpu.ReadDword(offset | 0x5028C);
             uint trfcRegValue = 0;
+            uint nitrosettings = Utils.BitSlice(cpu.ReadDword(offset | 0x50284u), 11, 0);
+            Nitro = new NitroSettings(nitrosettings);
+
 
             if (MEMCFG.Type == MemType.DDR4)
             {
